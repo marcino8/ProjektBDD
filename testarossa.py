@@ -5,6 +5,8 @@ import math
 import sys
 from graphviz import Digraph
 
+node_counter = 0
+
 
 class Tree:
     """
@@ -18,9 +20,25 @@ class Tree:
         Binary Decision Diagram
 
     """
-
     def __init__(self, node):
         self.root = node
+
+    def zbierz_infromacje(self):
+        info = []  # Zmienna na wyniki
+        node = self.root
+        self._zbierz_infromacje(node, info)
+        return info
+
+    def _zbierz_infromacje(self, wezel, wynik):
+        if wezel.has_next():  # Czy sa dalsze podzialy?
+            wynik.append(
+                [str(wezel.id), wezel.podzielone, str(wezel.lewy.id), str(wezel.prawy.id)])
+            if wezel.has_prawy():  # Jeśli tak to sprawdz to samo dla dzieci
+                self._zbierz_infromacje(wezel.prawy, wynik)
+            if wezel.has_lewy():
+                self._zbierz_infromacje(wezel.lewy, wynik)
+        else:
+            wynik.append([str(wezel.id), wezel.podzielone])
 
     def print_leafs(self):
         """
@@ -85,9 +103,11 @@ class Tree:
             # Jesli w dataframie w kolumnie wynikowej sa rozne wartosci
             # Kiedy beda takie same to nie liczymy entropii zeby zaoszczedzic pamieci
             co_dzielic = self.calc_entr(wezel.wartosc)
-            if sum(co_dzielic.iloc[0]) == 0:  # Warunek koncowy, jesli wszystkie wspolczynniki decyzyjne
+            if sum(co_dzielic.iloc[0]) == 0: # Warunek koncowy, jesli wszystkie wspolczynniki decyzyjne
+                wezel.podzielone = "WYNIK:"+str(set(wezel.wartosc[wezel.wartosc.columns[-1]]))
                 return  # I-Ej sa rowne 0 to znaczy ze juz dalej nie dzielimy, wiec przerwij
-            wezel.podzielone = str(co_dzielic.idxmax(axis=1)[0])
+            wg_czego_dzielic = str(co_dzielic.idxmax(axis=1)[0])
+            wezel.podzielone = "Czy "+str(wg_czego_dzielic[:-1]) +"=="+str(int(wg_czego_dzielic[-1]))
             podzielone = self.splitByEntropyTable(wezel.wartosc, co_dzielic)  # Podziel dataframe wg maksymalnego I-Ej
             # Stworz nowe wezly i dolacz je do drzewa
             node_p = Node(podzielone[0])
@@ -97,6 +117,8 @@ class Tree:
             # Dla nowych wezlow obliczaj kolejne podzialy
             self._compute_bdd(wezel.prawy)
             self._compute_bdd(wezel.lewy)
+        else:
+            wezel.podzielone = "WYNIK:"+str(set(wezel.wartosc[wezel.wartosc.columns[-1]]))
 
     def splitByEntropyTable(self, frame, E):
         """
@@ -222,7 +244,11 @@ class Node:
 
     """
 
+
     def __init__(self, df):
+        global node_counter
+        node_counter = 1 + node_counter
+        self.id = node_counter
         self.lewy = None
         self.prawy = None
         self.wartosc = df
@@ -292,27 +318,39 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
     threading.stack_size(200000000)
     thread = threading.Thread(target=drzewko.compute_bdd())
     thread.start()
-    drzewko.print_leafs()
+    # drzewko.print_leafs()
+    dot = Digraph(comment='The Round Table')
+    dot.attr('node', shape='box')
+    for v in drzewko.zbierz_infromacje():
+            if len(v) > 2:
+                dot.node(v[0], v[1])
+                dot.edge(v[0], v[2])
+                dot.edge(v[0], v[3])
+            else:
+                dot.node(v[0], v[1])
+    dot.render('test-output/round-table.gv', view=True)  # doctest: +SKIP
+    'test-output/round-table.gv.pdf'
 
 
-# sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'])
+
+sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'])
 
 #  TODO: ZAPYTAC O OSTATNIE PODZIALY BO ENTROPIE WYCHODZA 0 A DA SIE DZIELIC DALEJ
-framka = pd.DataFrame([[1, 1, 1, 1, 1], [1, 1, 2, 1, 1]])
-framka.columns = ["mama", "tata", "wujek", "brat", "siostra"]
-print(framka.to_string(index=False))
-
-
-
-dot = Digraph(comment='The Round Table')
-dot.attr('node', shape='box')
-dot.node('A', framka.to_string(index=False))
-dot.node('B', 'Sir Bedevere the Wise')
-dot.node('L', 'Sir Lancelot the Brave')
-dot.node('F', 'Cos tu mam')
-dot.edges(['AB', 'AL'])
-dot.edges(['LF'])
-print(dot.source)
-
-dot.render('test-output/round-table.gv', view=True)  # doctest: +SKIP
-'test-output/round-table.gv.pdf'
+# framka = pd.DataFrame([[1, 1, 1, 1, 1], [1, 1, 2, 1, 1]])
+# framka.columns = ["mama", "tata", "wujek", "brat", "siostra"]
+# print(framka.to_string(index=False))
+#
+# dot = Digraph(comment='The Round Table')
+# dot.attr('node', shape='box')
+# dot.node('1A', framka.to_string(index=False))
+# dot.node('2A', 'Sir Bedevere the Wise')
+# dot.node('L', 'Sir Lancelot the Brave')
+# dot.node('F', 'Cos tu mam')
+# dot.edges(['LF', 'LF'])
+# dot.edge('1A', '2A')
+# print(dot.source)
+#
+# dot.render('test-output/round-table.gv', view=True)  # doctest: +SKIP
+# 'test-output/round-table.gv.pdf'
+#
+# tree = Digraph(comment='Drzewo')
