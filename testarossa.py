@@ -17,6 +17,7 @@ class Tree:
         Binary Decision Diagram
 
     """
+
     def __init__(self, node):
         self.root = node
 
@@ -29,7 +30,7 @@ class Tree:
             in the binary tree has no children it is considered a leaf
 
         """
-        leafs = []
+        leafs = []  # Zmienna na wyniki
         node = self.root
         self._print_leafs(node, leafs)
         for leaf in leafs:
@@ -44,13 +45,14 @@ class Tree:
             Function includes recursion that helps func "print_leafs"
 
         """
-        if wezel.has_next():
-            if wezel.has_prawy():
+        if wezel.has_next():  # Czy sa dalsze podzialy?
+            if wezel.has_prawy():  # Jeśli tak to sprawdz to samo dla dzieci
                 self._print_leafs(wezel.prawy, wynik)
             if wezel.has_lewy():
                 self._print_leafs(wezel.lewy, wynik)
-        else:
+        else:  # Jeśli nie ma to dodaj dataframe do wynikow
             wynik.append(wezel.wartosc)
+
     # TODO: PEWNIE SPLIT LEAFS FUNC
 
     def compute_bdd(self):
@@ -79,14 +81,18 @@ class Tree:
 
         """
         if len(set(wezel.wartosc[wezel.wartosc.columns[-1]])) != 1:
+            # Jesli w dataframie w kolumnie wynikowej sa rozne wartosci
+            # Kiedy beda takie same to nie liczymy entropii zeby zaoszczedzic pamieci
             co_dzielic = self.calc_entr(wezel.wartosc)
-            if sum(co_dzielic.iloc[0]) == 0:  # JESLI WSZYSTKIE ENTROPIE SA ROWNE 0
-                return
-            podzielone = self.splitByEntropyTable(wezel.wartosc, co_dzielic)
+            if sum(co_dzielic.iloc[0]) == 0:  # Warunek koncowy, jesli wszystkie wspolczynniki decyzyjne
+                return                          # I-Ej sa rowne 0 to znaczy ze juz dalej nie dzielimy, wiec przerwij
+            podzielone = self.splitByEntropyTable(wezel.wartosc, co_dzielic)  # Podziel dataframe wg maksymalnego I-Ej
+            # Stworz nowe wezly i dolacz je do drzewa
             node_p = Node(podzielone[0])
             node_l = Node(podzielone[1])
             wezel.prawy = node_p
             wezel.lewy = node_l
+            # Dla nowych wezlow obliczaj kolejne podzialy
             self._compute_bdd(wezel.prawy)
             self._compute_bdd(wezel.lewy)
 
@@ -113,10 +119,11 @@ class Tree:
                 Second with every value but 2 in P column
 
         """
-        podzielone = []
-        wg_czego_dzielic = str(E.idxmax(axis=1)[0])  # Wartosc wg ktorwej dzielimy
-        value = int(wg_czego_dzielic[-1])
-        wg_czego_dzielic = wg_czego_dzielic[:-1]
+        podzielone = []  # Zmienna na wynik
+        wg_czego_dzielic = str(E.idxmax(axis=1)[0])  # Nazwa kolumny z maksymalnym wspolczynnikiem I-Ej (Xn)
+        value = int(wg_czego_dzielic[-1])  # Nazwa kolumny wg ktorwej dzielimy frame  (X)
+        wg_czego_dzielic = wg_czego_dzielic[:-1]  # Wartosc w kolumnie wg ktorej dzielimy (n)
+        # Podzial
         podzielone.append(frame[frame[wg_czego_dzielic] == value])
         podzielone.append(frame[frame[wg_czego_dzielic] != value])
         return podzielone
@@ -152,7 +159,7 @@ class Tree:
 
         """
         entropia_ukladu = 0
-        # Entropia układu I
+        # Obliczenie Entropii całego ukladu
         for value in set(frame[frame.columns[-1]]):
             n = len(frame[frame[frame.columns[-1]] == value])
             N = len(frame[frame.columns[-1]])
@@ -161,37 +168,41 @@ class Tree:
         # Wyliczanie E_j
         E = []
         kolumny = []
-        for przeslanka in frame.columns[0:-1]:  # Bez kolumny wynikowej ST
-            for value in set(frame[przeslanka]):
+        for przeslanka in frame.columns[0:-1]:  # Dla kazdej przesłanki znajdujacej sie w frame
+            for value in set(frame[przeslanka]):  # Dla kazdej wartosci danej przeslanki
                 sumaplus = 0
                 sumaminus = 0
-                N = len(frame[frame[przeslanka] == value])
+                N = len(frame[frame[przeslanka] == value])  # Ile jest danych w kolumnie przesłanka o wartosci value
                 if len(set(frame[przeslanka])) != 1:
-                    for st in set(frame[frame.columns[-1]]):
+                    for st in set(frame[frame.columns[-1]]):  # Dla kazdej wartosci kolumny wynikowej
                         pom = frame[frame[przeslanka] == value]
                         pom2 = frame[frame[przeslanka] != value]
+                        # Ile jest danych w kolumnie przesłanka o wartosci value
+                        # I o wartosci st w kolumnie wynikowej
                         n_plus = len(pom[pom[frame.columns[-1]] == st])
+                        # Ile jest danych w kolumnie przesłanka o wartosci roznej od value
+                        # I o wartosci st w kolumnie wynikowej
                         n_minus = len(pom2[pom2[frame.columns[-1]] == st])
                         if n_plus == 0:
                             Iplus = 0
                         else:
-                            Iplus = (-n_plus / N) * math.log(n_plus / N, 2)
+                            Iplus = (-n_plus / N) * math.log(n_plus / N, 2)  # Oblicz część I+
                         if n_minus == 0:
                             Iminus = 0
                         else:
                             Iminus = (-n_minus / (len(frame[frame.columns[-1]]) - N)) \
-                                     * math.log(n_minus / (len(frame[frame.columns[-1]]) - N), 2)
-                        sumaplus += Iplus
-                        sumaminus += Iminus
+                                     * math.log(n_minus / (len(frame[frame.columns[-1]]) - N), 2) # Oblicz część I-
+                        sumaplus += Iplus  # Dodaj odpowiednio tak, ze po zakonczeniu tej petli w sumaplus
+                        sumaminus += Iminus  # bedzie Ij+ a w sumaminus Ij-
                 Eip = (N / len(frame[frame.columns[-1]]))
                 Eim = (len(frame[frame.columns[-1]]) - N) / len(frame[frame.columns[-1]])
-                E.append(Eip * sumaplus + Eim * sumaminus)
-                kolumny.append(przeslanka + str(value))
+                E.append(Eip * sumaplus + Eim * sumaminus)  # Oblicz Ej
+                kolumny.append(przeslanka + str(value))  # Oznacz kolumne w dataframe np (W3)
         E = pd.DataFrame(E)
         E = E.transpose()
         E.columns = kolumny
         E = abs(np.repeat(entropia_ukladu, len(kolumny)) - E)  # Wyniki I-Ej
-        E = E.replace(entropia_ukladu, 0)
+        E = E.replace(entropia_ukladu, 0)  # Jesli jakies Ej jest rowne entropii ukladu, to znaczy ze Ej = 0
         return E
 
 
@@ -208,6 +219,7 @@ class Node:
         Function demonstrates how the program works
 
     """
+
     def __init__(self, df):
         self.lewy = None
         self.prawy = None
