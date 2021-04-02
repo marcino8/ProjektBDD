@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import math
 import sys
+from graphviz import Digraph
 
 
 class Tree:
@@ -85,7 +86,8 @@ class Tree:
             # Kiedy beda takie same to nie liczymy entropii zeby zaoszczedzic pamieci
             co_dzielic = self.calc_entr(wezel.wartosc)
             if sum(co_dzielic.iloc[0]) == 0:  # Warunek koncowy, jesli wszystkie wspolczynniki decyzyjne
-                return                          # I-Ej sa rowne 0 to znaczy ze juz dalej nie dzielimy, wiec przerwij
+                return  # I-Ej sa rowne 0 to znaczy ze juz dalej nie dzielimy, wiec przerwij
+            wezel.podzielone = str(co_dzielic.idxmax(axis=1)[0])
             podzielone = self.splitByEntropyTable(wezel.wartosc, co_dzielic)  # Podziel dataframe wg maksymalnego I-Ej
             # Stworz nowe wezly i dolacz je do drzewa
             node_p = Node(podzielone[0])
@@ -191,7 +193,7 @@ class Tree:
                             Iminus = 0
                         else:
                             Iminus = (-n_minus / (len(frame[frame.columns[-1]]) - N)) \
-                                     * math.log(n_minus / (len(frame[frame.columns[-1]]) - N), 2) # Oblicz część I-
+                                     * math.log(n_minus / (len(frame[frame.columns[-1]]) - N), 2)  # Oblicz część I-
                         sumaplus += Iplus  # Dodaj odpowiednio tak, ze po zakonczeniu tej petli w sumaplus
                         sumaminus += Iminus  # bedzie Ij+ a w sumaminus Ij-
                 Eip = (N / len(frame[frame.columns[-1]]))
@@ -224,6 +226,7 @@ class Node:
         self.lewy = None
         self.prawy = None
         self.wartosc = df
+        self.podzielone = ""
 
     def has_next(self):
         """
@@ -292,6 +295,24 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
     drzewko.print_leafs()
 
 
-sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'])
+# sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'])
 
 #  TODO: ZAPYTAC O OSTATNIE PODZIALY BO ENTROPIE WYCHODZA 0 A DA SIE DZIELIC DALEJ
+framka = pd.DataFrame([[1, 1, 1, 1, 1], [1, 1, 2, 1, 1]])
+framka.columns = ["mama", "tata", "wujek", "brat", "siostra"]
+print(framka.to_string(index=False))
+
+
+
+dot = Digraph(comment='The Round Table')
+dot.attr('node', shape='box')
+dot.node('A', framka.to_string(index=False))
+dot.node('B', 'Sir Bedevere the Wise')
+dot.node('L', 'Sir Lancelot the Brave')
+dot.node('F', 'Cos tu mam')
+dot.edges(['AB', 'AL'])
+dot.edges(['LF'])
+print(dot.source)
+
+dot.render('test-output/round-table.gv', view=True)  # doctest: +SKIP
+'test-output/round-table.gv.pdf'

@@ -1,0 +1,13 @@
+// The Round Table
+digraph {
+	node [shape=box]
+	A [label=" mama  tata  wujek  brat  siostra
+    1     1      1     1        1
+    1     1      2     1        1"]
+	B [label="Sir Bedevere the Wise"]
+	L [label="Sir Lancelot the Brave"]
+	F [label="Cos tu mam"]
+	A -> B
+	A -> L
+	L -> F
+}
