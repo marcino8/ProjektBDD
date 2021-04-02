@@ -1,4 +1,4 @@
-// The Round Table
+// BDD
 digraph {
 	node [shape=box]
 	1 [label="Czy O==1"]

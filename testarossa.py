@@ -17,28 +17,73 @@ class Tree:
 
         Description:
         This is the class containing whole structure of
-        Binary Decision Diagram
+        Binary Decision Diagram.
 
+        Limitation:
+        The class can not compute Binary Decision Diagram for
+        dataframes that contain variable columns with set of
+        unique values longer then 9
     """
+
     def __init__(self, node):
         self.root = node
 
-    def zbierz_infromacje(self):
+    def print_diagram(self):
+        """
+            Summary or Description of the Function
+
+            Description:
+            Function creates graphic representation of BDD based on values gathered
+            in gather_info func. This requires graphviz lib
+
+        """
         info = []  # Zmienna na wyniki
         node = self.root
-        self._zbierz_infromacje(node, info)
-        return info
+        self.gather_info(node, info)  # Zbierz informacje
+        dot = Digraph(comment='BDD')  # Stwórz diagram
+        dot.attr('node', shape='box')
+        for v in info:
+            if len(v) > 2:
+                dot.node(v[0], v[1])
+                dot.edge(v[0], v[2])
+                dot.edge(v[0], v[3])
+            else:
+                dot.node(v[0], v[1])
+        dot.render('test-output/round-table.gv', view=True)  # doctest: +SKIP
+        'test-output/round-table.gv.pdf'
 
-    def _zbierz_infromacje(self, wezel, wynik):
-        if wezel.has_next():  # Czy sa dalsze podzialy?
-            wynik.append(
-                [str(wezel.id), wezel.podzielone, str(wezel.lewy.id), str(wezel.prawy.id)])
-            if wezel.has_prawy():  # Jeśli tak to sprawdz to samo dla dzieci
-                self._zbierz_infromacje(wezel.prawy, wynik)
-            if wezel.has_lewy():
-                self._zbierz_infromacje(wezel.lewy, wynik)
+    def gather_info(self, node, result):
+        """
+            Summary or Description of the Function
+
+            Parameters:
+            Node node: Current node in the recursion throughout tree structure
+            List of Lists result: List to pass the information gathered
+
+            Description:
+            Function iterates throughout whole tree and for every node it gets:
+            Node id
+            What was dataframe in this node divided by
+            Left child id
+            Right child id
+            All of it is put into a list, and in form of list put into result.
+            If node has no children, then information gathered is:
+            Node id
+            Set of values in result column of the dataframe in value variable of the node
+        """
+        if node.has_next():  # Czy sa dalsze podzialy?
+            #  Jeśli są dalsze podzialy, zbierz informacje o id, i o id polaczonych wezlow, oraz przez co
+            #  dzielony byl dataframe w wezle
+            result.append(
+                [str(node.id), node.divided_by, str(node.left.id), str(node.right.id)])
+            if node.has_right_child():
+                self.gather_info(node.right, result)
+            if node.has_left_child():
+                self.gather_info(node.left, result)
         else:
-            wynik.append([str(wezel.id), wezel.podzielone])
+            #  Jeśli nie ma dalszych podzialow, zbierz tylko informacje o id, i w tym wypadku divided_by
+            #  To zbior wartosci kolumny wynikowej
+            result.append([str(node.id), node.divided_by])
 
     def print_leafs(self):
         """
@@ -56,7 +101,7 @@ class Tree:
             print(leaf)
             print()
 
-    def _print_leafs(self, wezel, wynik):
+    def _print_leafs(self, node, result):
         """
         Summary or Description of the Function
 
@@ -64,13 +109,13 @@ class Tree:
             Function includes recursion that helps func "print_leafs"
 
         """
-        if wezel.has_next():  # Czy sa dalsze podzialy?
-            if wezel.has_prawy():  # Jeśli tak to sprawdz to samo dla dzieci
-                self._print_leafs(wezel.prawy, wynik)
-            if wezel.has_lewy():
-                self._print_leafs(wezel.lewy, wynik)
+        if node.has_next():  # Czy sa dalsze podzialy?
+            if node.has_right_child():  # Jeśli tak to sprawdz to samo dla dzieci
+                self._print_leafs(node.right, result)
+            if node.has_left_child():
+                self._print_leafs(node.left, result)
         else:  # Jeśli nie ma to dodaj dataframe do wynikow
-            wynik.append(wezel.wartosc)
+            result.append(node.value)
 
     # TODO: PEWNIE SPLIT LEAFS FUNC
 
@@ -80,45 +125,46 @@ class Tree:
 
             Description:
             Function starts computing Binary Decision  based on
-            Dataframe in self.root.wartosc
+            Dataframe in self.root.value
 
         """
         self._compute_bdd(self.root)
 
-    def _compute_bdd(self, wezel):
+    def _compute_bdd(self, node):
         """
             Summary or Description of the Function
 
             Parameters:
-            Node wezel: Node of a tree
+            Node node: Node of a tree
 
             Description:
-            Function computes entropy tables for dataframe in wezel.wartosc.
+            Function computes entropy tables for dataframe in node.value.
             Then it splits dataframe using splitByEntropyTable func. And puts
-            the results as children of the current node(wezel).
+            the results as children of the current node(node).
             This happens untill splitByEntropyTable does not return 0s.
 
         """
-        if len(set(wezel.wartosc[wezel.wartosc.columns[-1]])) != 1:
+        if len(set(node.value[node.value.columns[-1]])) != 1:
             # Jesli w dataframie w kolumnie wynikowej sa rozne wartosci
             # Kiedy beda takie same to nie liczymy entropii zeby zaoszczedzic pamieci
-            co_dzielic = self.calc_entr(wezel.wartosc)
-            if sum(co_dzielic.iloc[0]) == 0: # Warunek koncowy, jesli wszystkie wspolczynniki decyzyjne
-                wezel.podzielone = "WYNIK:"+str(set(wezel.wartosc[wezel.wartosc.columns[-1]]))
+            co_dzielic = self.calc_entr(node.value)
+            if sum(co_dzielic.iloc[0]) == 0:  # Warunek koncowy, jesli wszystkie wspolczynniki decyzyjne
+                node.divided_by = "WYNIK:" + str(set(node.value[node.value.columns[-1]]))
                 return  # I-Ej sa rowne 0 to znaczy ze juz dalej nie dzielimy, wiec przerwij
+            # Zapisz wg czego zostanie podzielony dataframe, w formie "Czy P == 1"
             wg_czego_dzielic = str(co_dzielic.idxmax(axis=1)[0])
-            wezel.podzielone = "Czy "+str(wg_czego_dzielic[:-1]) +"=="+str(int(wg_czego_dzielic[-1]))
-            podzielone = self.splitByEntropyTable(wezel.wartosc, co_dzielic)  # Podziel dataframe wg maksymalnego I-Ej
+            node.divided_by = "Czy " + str(wg_czego_dzielic[:-1]) + "==" + str(int(wg_czego_dzielic[-1]))
+            podzielone = self.splitByEntropyTable(node.value, co_dzielic)  # Podziel dataframe wg maksymalnego I-Ej
             # Stworz nowe wezly i dolacz je do drzewa
             node_p = Node(podzielone[0])
             node_l = Node(podzielone[1])
-            wezel.prawy = node_p
-            wezel.lewy = node_l
+            node.right = node_p
+            node.left = node_l
             # Dla nowych wezlow obliczaj kolejne podzialy
-            self._compute_bdd(wezel.prawy)
-            self._compute_bdd(wezel.lewy)
+            self._compute_bdd(node.right)
+            self._compute_bdd(node.left)
         else:
-            wezel.podzielone = "WYNIK:"+str(set(wezel.wartosc[wezel.wartosc.columns[-1]]))
+            node.divided_by = "WYNIK:" + str(set(node.value[node.value.columns[-1]]))
 
     def splitByEntropyTable(self, frame, E):
         """
@@ -143,7 +189,7 @@ class Tree:
                 Second with every value but 2 in P column
 
         """
-        podzielone = []  # Zmienna na wynik
+        podzielone = []  # Zmienna na result
         wg_czego_dzielic = str(E.idxmax(axis=1)[0])  # Nazwa kolumny z maksymalnym wspolczynnikiem I-Ej (Xn)
         value = int(wg_czego_dzielic[-1])  # Nazwa kolumny wg ktorwej dzielimy frame  (X)
         wg_czego_dzielic = wg_czego_dzielic[:-1]  # Wartosc w kolumnie wg ktorej dzielimy (n)
@@ -178,29 +224,31 @@ class Tree:
             result dataframe will look like:
 
             W1      W2      P1      P2
-            x1      x2      x3      x4
+            I-Ew1    I-Ew2    I-Ep1    I-Ep2
 
-
+            where:
+            I is entropy of the whole dataframe
+            Exj is entropy of variable X of value j
         """
-        entropia_ukladu = 0
+        entropy_of_df = 0
         # Obliczenie Entropii całego ukladu
         for value in set(frame[frame.columns[-1]]):
             n = len(frame[frame[frame.columns[-1]] == value])
             N = len(frame[frame.columns[-1]])
-            entropia_ukladu += (-n / N) * math.log(n / N, 2)
+            entropy_of_df += (-n / N) * math.log(n / N, 2)
 
         # Wyliczanie E_j
         E = []
         kolumny = []
-        for przeslanka in frame.columns[0:-1]:  # Dla kazdej przesłanki znajdujacej sie w frame
-            for value in set(frame[przeslanka]):  # Dla kazdej wartosci danej przeslanki
-                sumaplus = 0
-                sumaminus = 0
-                N = len(frame[frame[przeslanka] == value])  # Ile jest danych w kolumnie przesłanka o wartosci value
-                if len(set(frame[przeslanka])) != 1:
+        for variable in frame.columns[0:-1]:  # Dla kazdej przesłanki znajdujacej sie w frame
+            for value in set(frame[variable]):  # Dla kazdej wartosci danej przeslanki
+                sum_plus = 0
+                sum_minus = 0
+                N = len(frame[frame[variable] == value])  # Ile jest danych w kolumnie przesłanka o wartosci value
+                if len(set(frame[variable])) != 1:
                     for st in set(frame[frame.columns[-1]]):  # Dla kazdej wartosci kolumny wynikowej
-                        pom = frame[frame[przeslanka] == value]
-                        pom2 = frame[frame[przeslanka] != value]
+                        pom = frame[frame[variable] == value]
+                        pom2 = frame[frame[variable] != value]
                         # Ile jest danych w kolumnie przesłanka o wartosci value
                         # I o wartosci st w kolumnie wynikowej
                         n_plus = len(pom[pom[frame.columns[-1]] == st])
@@ -216,17 +264,17 @@ class Tree:
                         else:
                             Iminus = (-n_minus / (len(frame[frame.columns[-1]]) - N)) \
                                      * math.log(n_minus / (len(frame[frame.columns[-1]]) - N), 2)  # Oblicz część I-
-                        sumaplus += Iplus  # Dodaj odpowiednio tak, ze po zakonczeniu tej petli w sumaplus
-                        sumaminus += Iminus  # bedzie Ij+ a w sumaminus Ij-
+                        sum_plus += Iplus  # Dodaj odpowiednio tak, ze po zakonczeniu tej petli w sumaplus
+                        sum_minus += Iminus  # bedzie Ij+ a w sumaminus Ij-
                 Eip = (N / len(frame[frame.columns[-1]]))
                 Eim = (len(frame[frame.columns[-1]]) - N) / len(frame[frame.columns[-1]])
-                E.append(Eip * sumaplus + Eim * sumaminus)  # Oblicz Ej
-                kolumny.append(przeslanka + str(value))  # Oznacz kolumne w dataframe np (W3)
+                E.append(Eip * sum_plus + Eim * sum_minus)  # Oblicz Ej
+                kolumny.append(variable + str(value))  # Oznacz kolumne w dataframe np (W3)
         E = pd.DataFrame(E)
         E = E.transpose()
         E.columns = kolumny
-        E = abs(np.repeat(entropia_ukladu, len(kolumny)) - E)  # Wyniki I-Ej
-        E = E.replace(entropia_ukladu, 0)  # Jesli jakies Ej jest rowne entropii ukladu, to znaczy ze Ej = 0
+        E = abs(np.repeat(entropy_of_df, len(kolumny)) - E)  # Wyniki I-Ej
+        E = E.replace(entropy_of_df, 0)  # Jesli jakies Ej jest rowne entropii ukladu, to znaczy ze Ej = 0
         return E
 
 
@@ -235,24 +283,26 @@ class Node:
         Summary or Description of the Class
 
         Variables:
-        Node lewy: value of left child in tree structure
-        Node prawy: value of right child in tree structure
-        pandas.DataFrame wartosc: value in node
+        Node left: value of left child in tree structure
+        Node right: value of right child in tree structure
+        pandas.DataFrame value: value in node
+        int id: counter for the generated nodes in the program
+        string divided_by: string formula determining by what dataframe in value was divided
+            if Node has no children, variable contains set of values of result column in value dataframe
 
         Description:
-        Function demonstrates how the program works
+        A node of a tree
 
     """
-
 
     def __init__(self, df):
         global node_counter
         node_counter = 1 + node_counter
         self.id = node_counter
-        self.lewy = None
-        self.prawy = None
-        self.wartosc = df
-        self.podzielone = ""
+        self.left = None
+        self.right = None
+        self.value = df
+        self.divided_by = ""
 
     def has_next(self):
         """
@@ -265,9 +315,9 @@ class Node:
             Determines whether node has any children
 
         """
-        return (self.prawy is not None) | (self.lewy is not None)
+        return (self.right is not None) | (self.left is not None)
 
-    def has_prawy(self):
+    def has_right_child(self):
         """
             Summary or Description of the Function
 
@@ -278,9 +328,9 @@ class Node:
             Determines whether node has right child
 
         """
-        return self.prawy is not None
+        return self.right is not None
 
-    def has_lewy(self):
+    def has_left_child(self):
         """
             Summary or Description of the Function
 
@@ -291,7 +341,7 @@ class Node:
             Determines whether node has left child
 
         """
-        return self.lewy is not None
+        return self.left is not None
 
 
 def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
@@ -301,7 +351,7 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
         Parameters:
         int(+) recursion_limit: override system default recursion limit(10**4)
             if the input table is too big.
-        string file: path to csv dataframe to read and to put into root.wartosc of Tree
+        string file: path to csv dataframe to read and to put into root.value of Tree
         optional bool rename_columns: decide whether to rename columns or no
         optional list of strings rename_list: decide the names of columns
 
@@ -318,19 +368,7 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
     threading.stack_size(200000000)
     thread = threading.Thread(target=drzewko.compute_bdd())
     thread.start()
-    # drzewko.print_leafs()
-    dot = Digraph(comment='The Round Table')
-    dot.attr('node', shape='box')
-    for v in drzewko.zbierz_infromacje():
-            if len(v) > 2:
-                dot.node(v[0], v[1])
-                dot.edge(v[0], v[2])
-                dot.edge(v[0], v[3])
-            else:
-                dot.node(v[0], v[1])
-    dot.render('test-output/round-table.gv', view=True)  # doctest: +SKIP
-    'test-output/round-table.gv.pdf'
-
+    drzewko.print_diagram()
 
 
 sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'])
