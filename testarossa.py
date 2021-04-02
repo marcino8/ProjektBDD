@@ -26,6 +26,74 @@ class Tree:
         else:
             wynik.append(wezel.wartosc)
     # TODO: PEWNIE SPLIT LEAFS FUNC
+    def licz_drzewo_start(self):
+        self._licz_drzewo(self.root)
+
+    def _licz_drzewo(self, wezel):
+        if len(set(wezel.wartosc[wezel.wartosc.columns[-1]])) != 1:
+            co_dzielic = self.calc_entr(wezel.wartosc)
+            if sum(co_dzielic.iloc[0]) == 0:  # JESLI WSZYSTKIE ENTROPIE SA ROWNE 0
+                return
+            podzielone = self.splitByEntropyTable(wezel.wartosc, co_dzielic)
+            node_p = Node(podzielone[0])
+            node_l = Node(podzielone[1])
+            wezel.prawy = node_p
+            wezel.lewy = node_l
+            self._licz_drzewo(wezel.prawy)
+            self._licz_drzewo(wezel.lewy)
+
+    def splitByEntropyTable(self, frame, E):
+        podzielone = []
+        wg_czego_dzielic = str(E.idxmax(axis=1)[0])  # Wartosc wg ktorwej dzielimy
+        value = int(wg_czego_dzielic[-1])
+        wg_czego_dzielic = wg_czego_dzielic[:-1]
+        podzielone.append(frame[frame[wg_czego_dzielic] == value])
+        podzielone.append(frame[frame[wg_czego_dzielic] != value])
+        return podzielone
+
+    def calc_entr(self, frame):  # Przy załozeniu ze kolumna wynikow dzielonego df ma nazwe ST
+        entropia_ukladu = 0
+        # Entropia układu I
+        for value in set(frame[frame.columns[-1]]):
+            n = len(frame[frame[frame.columns[-1]] == value])
+            N = len(frame[frame.columns[-1]])
+            entropia_ukladu += (-n / N) * math.log(n / N, 2)
+
+        # Wyliczanie E_j
+        E = []
+        kolumny = []
+        for przeslanka in frame.columns[0:-1]:  # Bez kolumny wynikowej ST
+            for value in set(frame[przeslanka]):
+                sumaplus = 0
+                sumaminus = 0
+                N = len(frame[frame[przeslanka] == value])
+                if len(set(frame[przeslanka])) != 1:
+                    for st in set(frame[frame.columns[-1]]):
+                        pom = frame[frame[przeslanka] == value]
+                        pom2 = frame[frame[przeslanka] != value]
+                        n_plus = len(pom[pom[frame.columns[-1]] == st])
+                        n_minus = len(pom2[pom2[frame.columns[-1]] == st])
+                        if n_plus == 0:
+                            Iplus = 0
+                        else:
+                            Iplus = (-n_plus / N) * math.log(n_plus / N, 2)
+                        if n_minus == 0:
+                            Iminus = 0
+                        else:
+                            Iminus = (-n_minus / (len(frame[frame.columns[-1]]) - N)) \
+                                     * math.log(n_minus / (len(frame[frame.columns[-1]]) - N), 2)
+                        sumaplus += Iplus
+                        sumaminus += Iminus
+                Eip = (N / len(frame[frame.columns[-1]]))
+                Eim = (len(frame[frame.columns[-1]]) - N) / len(frame[frame.columns[-1]])
+                E.append(Eip * sumaplus + Eim * sumaminus)
+                kolumny.append(przeslanka + str(value))
+        E = pd.DataFrame(E)
+        E = E.transpose()
+        E.columns = kolumny
+        E = abs(np.repeat(entropia_ukladu, len(kolumny)) - E)  # Wyniki I-Ej
+        E = E.replace(entropia_ukladu, 0)
+        return E
 
 
 class Node:
@@ -45,81 +113,6 @@ class Node:
         return self.lewy is not None
 
 
-def splitByEntropyTable(frame, E):
-    podzielone = []
-    wg_czego_dzielic = str(E.idxmax(axis=1)[0])  # Wartosc wg ktorwej dzielimy
-    value = int(wg_czego_dzielic[-1])
-    wg_czego_dzielic = wg_czego_dzielic[:-1]
-    podzielone.append(frame[frame[wg_czego_dzielic] == value])
-    podzielone.append(frame[frame[wg_czego_dzielic] != value])
-    return podzielone
-
-
-def calc_entr(frame):  # Przy załozeniu ze kolumna wynikow dzielonego df ma nazwe ST
-    entropia_ukladu = 0
-    # Entropia układu I
-    for value in set(frame[frame.columns[-1]]):
-        n = len(frame[frame[frame.columns[-1]] == value])
-        N = len(frame[frame.columns[-1]])
-        entropia_ukladu += (-n / N) * math.log(n / N, 2)
-
-    # Wyliczanie E_j
-    E = []
-    kolumny = []
-    for przeslanka in frame.columns[0:-1]:  # Bez kolumny wynikowej ST
-        for value in set(frame[przeslanka]):
-            sumaplus = 0
-            sumaminus = 0
-            N = len(frame[frame[przeslanka] == value])
-            if len(set(frame[przeslanka])) != 1:
-                for st in set(frame[frame.columns[-1]]):
-                    pom = frame[frame[przeslanka] == value]
-                    pom2 = frame[frame[przeslanka] != value]
-                    n_plus = len(pom[pom[frame.columns[-1]] == st])
-                    n_minus = len(pom2[pom2[frame.columns[-1]] == st])
-                    if n_plus == 0:
-                        Iplus = 0
-                    else:
-                        Iplus = (-n_plus / N) * math.log(n_plus / N, 2)
-                    if n_minus == 0:
-                        Iminus = 0
-                    else:
-                        Iminus = (-n_minus / (len(frame[frame.columns[-1]]) - N)) \
-                                 * math.log(n_minus / (len(frame[frame.columns[-1]]) - N), 2)
-                    sumaplus += Iplus
-                    sumaminus += Iminus
-            Eip = (N / len(frame[frame.columns[-1]]))
-            Eim = (len(frame[frame.columns[-1]]) - N) / len(frame[frame.columns[-1]])
-            E.append(Eip * sumaplus + Eim * sumaminus)
-            kolumny.append(przeslanka + str(value))
-    E = pd.DataFrame(E)
-    E = E.transpose()
-    E.columns = kolumny
-    E = abs(np.repeat(entropia_ukladu, len(kolumny)) - E)  # Wyniki I-Ej
-    E = E.replace(entropia_ukladu, 0)
-    return E
-
-
-def licz_drzewo_start(tree):
-    dane = tree.root.wartosc
-    _licz_drzewo(tree.root, dane)
-
-
-def _licz_drzewo(node, dane):
-    if len(set(dane['ST'])) != 1:
-        co_dzielic = calc_entr(dane)
-        if sum(co_dzielic.iloc[0]) == 0:  # JESLI WSZYSTKIE ENTROPIE SA ROWNE 0
-            return
-        podzielone = splitByEntropyTable(dane, co_dzielic)
-        node_p = Node(podzielone[0])
-        node_l = Node(podzielone[1])
-        node.prawy = node_p
-        node.lewy = node_l
-        print(node.prawy, node.lewy)
-        _licz_drzewo(node.prawy, podzielone[0])
-        _licz_drzewo(node.lewy, podzielone[1])
-
-
 def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
     sys.setrecursionlimit(recursion_limit)
     df = pd.read_csv(file)
@@ -128,7 +121,7 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
         df.columns = rename_list
     drzewko = Tree(Node(df))
     threading.stack_size(200000000)
-    thread = threading.Thread(target=licz_drzewo_start(drzewko))
+    thread = threading.Thread(target=drzewko.licz_drzewo_start())
     thread.start()
     drzewko.wypisz_liscie()
 
