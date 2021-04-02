@@ -1,6 +1,6 @@
 // BDD
 digraph {
-	node [shape=box]
+	node [color=lightgrey shape=box style=filled]
 	1 [label="Czy O==1"]
 	1 -> 3
 	1 -> 2

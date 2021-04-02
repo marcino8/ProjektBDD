@@ -12,17 +12,27 @@ class Tree:
     """
         Summary or Description of the Class
 
-        Variables:
-        Node root: node from which the tree starts
+        Attributes:
+            Node root: node from which the tree starts
+
+        Methods:
+            print_diagram(self)
+            gather_info(self, node, result)
+            print_leafs(self)
+            _print_leafs(self, node, result)
+            compute_bdd(self)
+            _compute_bdd(self, node)
+            splitByEntropyTable(frame, E)
+            calc_entr(frame)
 
         Description:
-        This is the class containing whole structure of
-        Binary Decision Diagram.
+            This is the class containing whole structure of
+            Binary Decision Diagram.
 
         Limitation:
-        The class can not compute Binary Decision Diagram for
-        dataframes that contain variable columns with set of
-        unique values longer then 9
+            The class can not compute Binary Decision Diagram for
+            dataframes that contain variable columns with set of
+            unique values longer then 9
     """
 
     def __init__(self, node):
@@ -33,15 +43,15 @@ class Tree:
             Summary or Description of the Function
 
             Description:
-            Function creates graphic representation of BDD based on values gathered
-            in gather_info func. This requires graphviz lib
+                Function creates graphic representation of BDD based on values gathered
+                in gather_info func. This requires graphviz lib
 
         """
         info = []  # Zmienna na wyniki
         node = self.root
         self.gather_info(node, info)  # Zbierz informacje
         dot = Digraph(comment='BDD')  # Stwórz diagram
-        dot.attr('node', shape='box')
+        dot.attr('node', shape='box',style='filled', color='lightgrey')
         for v in info:
             if len(v) > 2:
                 dot.node(v[0], v[1])
@@ -57,19 +67,19 @@ class Tree:
             Summary or Description of the Function
 
             Parameters:
-            Node node: Current node in the recursion throughout tree structure
-            List of Lists result: List to pass the information gathered
+                Node node: Current node in the recursion throughout tree structure
+                List of Lists result: List to pass the information gathered
 
             Description:
-            Function iterates throughout whole tree and for every node it gets:
-            Node id
-            What was dataframe in this node divided by
-            Left child id
-            Right child id
-            All of it is put into a list, and in form of list put into result.
-            If node has no children, then information gathered is:
-            Node id
-            Set of values in result column of the dataframe in value variable of the node
+                Function iterates throughout whole tree and for every node it gets:
+                    Node id
+                    What was dataframe in this node divided by
+                    Left child id
+                    Right child id
+                All of it is put into a list, and in form of list put into result.
+                If node has no children, then information gathered is:
+                    Node id
+                    Set of values in result column of the dataframe in value variable of the node
         """
         if node.has_next():  # Czy sa dalsze podzialy?
             #  Jeśli są dalsze podzialy, zbierz informacje o id, i o id polaczonych wezlow, oraz przez co
@@ -90,8 +100,8 @@ class Tree:
         Summary or Description of the Function
 
             Description:
-            Function prints out leafes of a binary tree. If any node
-            in the binary tree has no children it is considered a leaf
+                Function prints out leafes of a binary tree. If any node
+                in the binary tree has no children it is considered a leaf
 
         """
         leafs = []  # Zmienna na wyniki
@@ -106,7 +116,7 @@ class Tree:
         Summary or Description of the Function
 
             Description:
-            Function includes recursion that helps func "print_leafs"
+                Function includes recursion that helps func "print_leafs"
 
         """
         if node.has_next():  # Czy sa dalsze podzialy?
@@ -124,8 +134,8 @@ class Tree:
             Summary or Description of the Function
 
             Description:
-            Function starts computing Binary Decision  based on
-            Dataframe in self.root.value
+                Function starts computing Binary Decision  based on
+                Dataframe in self.root.value
 
         """
         self._compute_bdd(self.root)
@@ -135,13 +145,13 @@ class Tree:
             Summary or Description of the Function
 
             Parameters:
-            Node node: Node of a tree
+                Node node: Node of a tree
 
             Description:
-            Function computes entropy tables for dataframe in node.value.
-            Then it splits dataframe using splitByEntropyTable func. And puts
-            the results as children of the current node(node).
-            This happens untill splitByEntropyTable does not return 0s.
+                Function computes entropy tables for dataframe in node.value.
+                Then it splits dataframe using splitByEntropyTable func. And puts
+                the results as children of the current node(node).
+                This happens untill splitByEntropyTable does not return 0s.
 
         """
         if len(set(node.value[node.value.columns[-1]])) != 1:
@@ -166,27 +176,28 @@ class Tree:
         else:
             node.divided_by = "WYNIK:" + str(set(node.value[node.value.columns[-1]]))
 
-    def splitByEntropyTable(self, frame, E):
+    @staticmethod
+    def splitByEntropyTable(frame, E):
         """
             Summary or Description of the Function
 
             Parameters:
-            pandas.DataFrame frame: Dataframe to divide
-            pandas.DataFrame E: Dataframe of calculated decision factors for frame
+                pandas.DataFrame frame: Dataframe to divide
+                pandas.DataFrame E: Dataframe of calculated decision factors for frame
 
             Returns:
-            List of 2 Dataframes, result of spliting parameter frame
+                List of 2 Dataframes, result of spliting parameter frame
 
             Description:
-            Function splits Dataframe into 2 Dataframes by value in column
-            which has biggest calculated decision factor.
-                            E.g. If
-                    W1      W2      P1      P2
-                    0.4     0.2     0.4     0.7
-            is E parameter, func splits parameter frame by column P
-            and P value 2. So the results are 2 tables:
-                One with only 2s in P column
-                Second with every value but 2 in P column
+                Function splits Dataframe into 2 Dataframes by value in column
+                which has biggest calculated decision factor.
+                              E.g. If
+                      W1      W2      P1      P2
+                      0.4     0.2     0.4     0.7
+                is E parameter, func splits parameter frame by column P
+                and P value 2. So the results are 2 tables:
+                    One with only 2s in P column
+                    Second with every value but 2 in P column
 
         """
         podzielone = []  # Zmienna na result
@@ -198,7 +209,8 @@ class Tree:
         podzielone.append(frame[frame[wg_czego_dzielic] != value])
         return podzielone
 
-    def calc_entr(self, frame):
+    @staticmethod
+    def calc_entr(frame):
         """
             Summary or Description of the Function
 
@@ -282,16 +294,21 @@ class Node:
     """
         Summary or Description of the Class
 
-        Variables:
-        Node left: value of left child in tree structure
-        Node right: value of right child in tree structure
-        pandas.DataFrame value: value in node
-        int id: counter for the generated nodes in the program
-        string divided_by: string formula determining by what dataframe in value was divided
-            if Node has no children, variable contains set of values of result column in value dataframe
+        Attributes:
+            Node left: value of left child in tree structure
+            Node right: value of right child in tree structure
+            pandas.DataFrame value: value in node
+            int id: counter for the generated nodes in the program
+            string divided_by: string formula determining by what dataframe in value was divided
+                if Node has no children, variable contains set of values of result column in value dataframe
+
+        Methods:
+            has_next(self)
+            has_right_child(self)
+            has_left_child(self)
 
         Description:
-        A node of a tree
+            A node of a tree structure
 
     """
 
@@ -313,6 +330,7 @@ class Node:
 
             Description:
             Determines whether node has any children
+
 
         """
         return (self.right is not None) | (self.left is not None)
@@ -349,14 +367,14 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
         Summary or Description of the Function
 
         Parameters:
-        int(+) recursion_limit: override system default recursion limit(10**4)
-            if the input table is too big.
-        string file: path to csv dataframe to read and to put into root.value of Tree
-        optional bool rename_columns: decide whether to rename columns or no
-        optional list of strings rename_list: decide the names of columns
+            int(+) recursion_limit: override system default recursion limit(10**4)
+                if the input table is too big.
+            string file: path to csv dataframe to read and to put into root.value of Tree
+            optional bool rename_columns: decide whether to rename columns or no
+            optional list of strings rename_list: decide the names of columns
 
         Description:
-        Function demonstrates how the program works
+            Function demonstrates how the program works
 
     """
     sys.setrecursionlimit(recursion_limit)
@@ -374,21 +392,4 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
 sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'])
 
 #  TODO: ZAPYTAC O OSTATNIE PODZIALY BO ENTROPIE WYCHODZA 0 A DA SIE DZIELIC DALEJ
-# framka = pd.DataFrame([[1, 1, 1, 1, 1], [1, 1, 2, 1, 1]])
-# framka.columns = ["mama", "tata", "wujek", "brat", "siostra"]
-# print(framka.to_string(index=False))
-#
-# dot = Digraph(comment='The Round Table')
-# dot.attr('node', shape='box')
-# dot.node('1A', framka.to_string(index=False))
-# dot.node('2A', 'Sir Bedevere the Wise')
-# dot.node('L', 'Sir Lancelot the Brave')
-# dot.node('F', 'Cos tu mam')
-# dot.edges(['LF', 'LF'])
-# dot.edge('1A', '2A')
-# print(dot.source)
-#
-# dot.render('test-output/round-table.gv', view=True)  # doctest: +SKIP
-# 'test-output/round-table.gv.pdf'
-#
-# tree = Digraph(comment='Drzewo')
+
