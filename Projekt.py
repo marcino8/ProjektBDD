@@ -65,8 +65,8 @@ class Tree:
                 dot.edge(v[0], v[3])
             else:
                 dot.node(v[0], v[1])
-        dot.render('test-output/round-table.gv', view=True)  # doctest: +SKIP
-        'test-output/round-table.gv.pdf'
+        dot.render('test-output/diagram.gv', view=True)  # doctest: +SKIP
+        'test-output/diagram.pdf'
 
     def gather_info(self, node, result):
         """
@@ -182,7 +182,7 @@ class Tree:
         """
             Summary or Description of the Function
 
-            Parameters:
+            Parameters:`
                 pandas.DataFrame frame: Dataframe to divide
                 pandas.DataFrame E: Dataframe of calculated decision factors for frame
 
@@ -323,6 +323,9 @@ class Node:
         Description:
             A node of a tree structure
 
+        Limitation:
+            *** No "/" marks in column names ***
+
     """
 
     def __init__(self, df):
@@ -376,8 +379,17 @@ class Node:
 
 
 def splitNameString(name):
-    result = name.split(sep="/")
-    return result
+    """
+        Summary or Description of the Function
+
+        Parameters:
+            :param name: string to divide
+
+        Description:
+            Divides string by '/'
+
+    """
+    return name.split(sep="/")
 
 
 def sample_use(recursion_limit, file, rename_columns=False, rename_list=None, indexes_in_first_column=False):
@@ -406,5 +418,5 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None, in
     drzewko.print_diagram()
     drzewko.print_leafs()
 
-print(splitNameString("granko/123")[1])
+
 sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'], True)
