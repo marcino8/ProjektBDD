@@ -255,7 +255,7 @@ class Tree:
             result dataframe will look like:
 
             W1      W2      P1      P2
-            I-Ew1    I-Ew2    I-Ep1    I-Ep2
+            I-Ew1   I-Ew2   I-Ep1   I-Ep2
 
             where:
             I is entropy of the whole dataframe
@@ -416,7 +416,6 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None, in
     thread = threading.Thread(target=drzewko.compute_bdd())
     thread.start()
     drzewko.print_diagram()
-    drzewko.print_leafs()
 
 
 sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'], True)
