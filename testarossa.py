@@ -24,15 +24,24 @@ class Tree:
             _compute_bdd(self, node)
             splitByEntropyTable(frame, E)
             calc_entr(frame)
+            calc_main_entr(frame)
 
         Description:
             This is the class containing whole structure of
             Binary Decision Diagram.
 
         Limitation:
-            The class can not compute Binary Decision Diagram for
+            The class cannot compute Binary Decision Diagram for
             dataframes that contain variable columns with set of
             unique values longer then 9
+
+        Required libraries:
+            threading
+            math
+            pandas
+            numpy
+            sys
+            graphviz
     """
 
     def __init__(self, node):
@@ -51,7 +60,8 @@ class Tree:
         node = self.root
         self.gather_info(node, info)  # Zbierz informacje
         dot = Digraph(comment='BDD')  # Stwórz diagram
-        dot.attr('node', shape='box',style='filled', color='lightgrey')
+        dot.attr('node', shape='box', style='filled', color='lightgrey')
+        dot.node("info", "LEGENDA \n X == y \n Jeśli tak: idź w prawo | Jeśli nie: idź w lewo")
         for v in info:
             if len(v) > 2:
                 dot.node(v[0], v[1])
@@ -127,8 +137,6 @@ class Tree:
         else:  # Jeśli nie ma to dodaj dataframe do wynikow
             result.append(node.value)
 
-    # TODO: PEWNIE SPLIT LEAFS FUNC
-
     def compute_bdd(self):
         """
             Summary or Description of the Function
@@ -158,12 +166,9 @@ class Tree:
             # Jesli w dataframie w kolumnie wynikowej sa rozne wartosci
             # Kiedy beda takie same to nie liczymy entropii zeby zaoszczedzic pamieci
             co_dzielic = self.calc_entr(node.value)
-            if sum(co_dzielic.iloc[0]) == 0:  # Warunek koncowy, jesli wszystkie wspolczynniki decyzyjne
-                node.divided_by = "WYNIK:" + str(set(node.value[node.value.columns[-1]]))
-                return  # I-Ej sa rowne 0 to znaczy ze juz dalej nie dzielimy, wiec przerwij
             # Zapisz wg czego zostanie podzielony dataframe, w formie "Czy P == 1"
             wg_czego_dzielic = str(co_dzielic.idxmax(axis=1)[0])
-            node.divided_by = "Czy " + str(wg_czego_dzielic[:-1]) + "==" + str(int(wg_czego_dzielic[-1]))
+            node.divided_by = "Czy " + str(wg_czego_dzielic[:-1]) + " == " + str(int(wg_czego_dzielic[-1]))
             podzielone = self.splitByEntropyTable(node.value, co_dzielic)  # Podziel dataframe wg maksymalnego I-Ej
             # Stworz nowe wezly i dolacz je do drzewa
             node_p = Node(podzielone[0])
@@ -173,8 +178,8 @@ class Tree:
             # Dla nowych wezlow obliczaj kolejne podzialy
             self._compute_bdd(node.right)
             self._compute_bdd(node.left)
-        else:
-            node.divided_by = "WYNIK:" + str(set(node.value[node.value.columns[-1]]))
+        else: # Jesli w dataframie w kolumnie wynikowej jest jedna wartosc, to skoncz pod rekurencje
+            node.divided_by = "Wybierz: " + str(set(node.value[node.value.columns[-1]]).pop())
 
     @staticmethod
     def splitByEntropyTable(frame, E):
@@ -210,15 +215,31 @@ class Tree:
         return podzielone
 
     @staticmethod
+    def calc_main_entr(frame):
+        """
+            Summary or Description of the Function
+
+            Parameters:
+            pandas.DataFrame frame: Dataframe to calculate main entropy
+
+            Description:
+            Function calculates main entropy of the given dataframe
+        """
+        entropy_of_df = 0
+        # Obliczenie Entropii całego ukladu
+        for value in set(frame[frame.columns[-1]]):
+            n = len(frame[frame[frame.columns[-1]] == value])
+            N = len(frame[frame.columns[-1]])
+            entropy_of_df += (-n / N) * math.log(n / N, 2)
+        return entropy_of_df
+
+    @staticmethod
     def calc_entr(frame):
         """
             Summary or Description of the Function
 
             Parameters:
             pandas.DataFrame frame: Dataframe to calculate decision factors
-
-            Returns:
-            pandas.DataFrame of calculated decision factors for frame Dataframe
 
             Description:
             Function calculates entropies for each value in each column without
@@ -242,22 +263,17 @@ class Tree:
             I is entropy of the whole dataframe
             Exj is entropy of variable X of value j
         """
-        entropy_of_df = 0
-        # Obliczenie Entropii całego ukladu
-        for value in set(frame[frame.columns[-1]]):
-            n = len(frame[frame[frame.columns[-1]] == value])
-            N = len(frame[frame.columns[-1]])
-            entropy_of_df += (-n / N) * math.log(n / N, 2)
+        entropy_of_df = Tree.calc_main_entr(frame)  # Wyliczenie entropii ogolnej
 
         # Wyliczanie E_j
         E = []
         kolumny = []
         for variable in frame.columns[0:-1]:  # Dla kazdej przesłanki znajdujacej sie w frame
-            for value in set(frame[variable]):  # Dla kazdej wartosci danej przeslanki
-                sum_plus = 0
-                sum_minus = 0
-                N = len(frame[frame[variable] == value])  # Ile jest danych w kolumnie przesłanka o wartosci value
-                if len(set(frame[variable])) != 1:
+            if len(set(frame[variable])) != 1:  # Jesli wartośc przesłanki nie jest taka sama w całej kolumnie
+                for value in set(frame[variable]):  # Dla kazdej wartosci danej przeslanki
+                    N = len(frame[frame[variable] == value])  # Ile jest danych w kolumnie przesłanka o wartosci value
+                    sum_plus = 0
+                    sum_minus = 0
                     for st in set(frame[frame.columns[-1]]):  # Dla kazdej wartosci kolumny wynikowej
                         pom = frame[frame[variable] == value]
                         pom2 = frame[frame[variable] != value]
@@ -278,15 +294,14 @@ class Tree:
                                      * math.log(n_minus / (len(frame[frame.columns[-1]]) - N), 2)  # Oblicz część I-
                         sum_plus += Iplus  # Dodaj odpowiednio tak, ze po zakonczeniu tej petli w sumaplus
                         sum_minus += Iminus  # bedzie Ij+ a w sumaminus Ij-
-                Eip = (N / len(frame[frame.columns[-1]]))
-                Eim = (len(frame[frame.columns[-1]]) - N) / len(frame[frame.columns[-1]])
-                E.append(Eip * sum_plus + Eim * sum_minus)  # Oblicz Ej
-                kolumny.append(variable + str(value))  # Oznacz kolumne w dataframe np (W3)
+                    Eip = (N / len(frame[frame.columns[-1]]))
+                    Eim = (len(frame[frame.columns[-1]]) - N) / len(frame[frame.columns[-1]])
+                    E.append(Eip * sum_plus + Eim * sum_minus)  # Oblicz Ej
+                    kolumny.append(variable + str(value))  # Oznacz kolumne w dataframe np (W3)
         E = pd.DataFrame(E)
         E = E.transpose()
         E.columns = kolumny
-        E = abs(np.repeat(entropy_of_df, len(kolumny)) - E)  # Wyniki I-Ej
-        E = E.replace(entropy_of_df, 0)  # Jesli jakies Ej jest rowne entropii ukladu, to znaczy ze Ej = 0
+        E = np.repeat(entropy_of_df, len(kolumny)) - E  # Wyniki I-Ej
         return E
 
 
@@ -362,24 +377,23 @@ class Node:
         return self.left is not None
 
 
-def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
+def sample_use(recursion_limit, file, rename_columns=False, rename_list=None, indexes_in_first_column=False):
     """
-        Summary or Description of the Function
-
-        Parameters:
-            int(+) recursion_limit: override system default recursion limit(10**4)
-                if the input table is too big.
-            string file: path to csv dataframe to read and to put into root.value of Tree
-            optional bool rename_columns: decide whether to rename columns or no
-            optional list of strings rename_list: decide the names of columns
-
         Description:
             Function demonstrates how the program works
+            :param indexes_in_first_column: bool decide whether first column of your dataframe
+                contains rows indexing
+            :param rename_list: list of strings decide the names of columns
+            :param rename_columns: bool decide whether to rename columns or no
+            :param file: string path to csv dataframe to read and to put into root.value of Tree
+            :param recursion_limit: int(+) override system default recursion limit(10**4)
+                if the input table is too big.
 
     """
     sys.setrecursionlimit(recursion_limit)
     df = pd.read_csv(file)
-    df = df.iloc[:, 1:7]
+    if indexes_in_first_column:
+        df = df.iloc[:, 1:7]
     if rename_columns:
         df.columns = rename_list
     drzewko = Tree(Node(df))
@@ -387,9 +401,9 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None):
     thread = threading.Thread(target=drzewko.compute_bdd())
     thread.start()
     drzewko.print_diagram()
+    drzewko.print_leafs()
 
 
-sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'])
+sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'], True)
 
-#  TODO: ZAPYTAC O OSTATNIE PODZIALY BO ENTROPIE WYCHODZA 0 A DA SIE DZIELIC DALEJ
 
