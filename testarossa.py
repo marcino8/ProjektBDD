@@ -8,6 +8,7 @@ from graphviz import Digraph
 node_counter = 0
 
 
+# V2: LIMITATION
 class Tree:
     """
         Summary or Description of the Class
@@ -29,11 +30,6 @@ class Tree:
         Description:
             This is the class containing whole structure of
             Binary Decision Diagram.
-
-        Limitation:
-            The class cannot compute Binary Decision Diagram for
-            dataframes that contain variable columns with set of
-            unique values longer then 9
 
         Required libraries:
             threading
@@ -167,8 +163,8 @@ class Tree:
             # Kiedy beda takie same to nie liczymy entropii zeby zaoszczedzic pamieci
             co_dzielic = self.calc_entr(node.value)
             # Zapisz wg czego zostanie podzielony dataframe, w formie "Czy P == 1"
-            wg_czego_dzielic = str(co_dzielic.idxmax(axis=1)[0])
-            node.divided_by = "Czy " + str(wg_czego_dzielic[:-1]) + " == " + str(int(wg_czego_dzielic[-1]))
+            wg_czego_dzielic = splitNameString(str(co_dzielic.idxmax(axis=1)[0]))
+            node.divided_by = "Czy " + wg_czego_dzielic[0] + " == " + wg_czego_dzielic[1]
             podzielone = self.splitByEntropyTable(node.value, co_dzielic)  # Podziel dataframe wg maksymalnego I-Ej
             # Stworz nowe wezly i dolacz je do drzewa
             node_p = Node(podzielone[0])
@@ -178,7 +174,7 @@ class Tree:
             # Dla nowych wezlow obliczaj kolejne podzialy
             self._compute_bdd(node.right)
             self._compute_bdd(node.left)
-        else: # Jesli w dataframie w kolumnie wynikowej jest jedna wartosc, to skoncz pod rekurencje
+        else:  # Jesli w dataframie w kolumnie wynikowej jest jedna wartosc, to skoncz pod rekurencje
             node.divided_by = "Wybierz: " + str(set(node.value[node.value.columns[-1]]).pop())
 
     @staticmethod
@@ -206,9 +202,11 @@ class Tree:
 
         """
         podzielone = []  # Zmienna na result
-        wg_czego_dzielic = str(E.idxmax(axis=1)[0])  # Nazwa kolumny z maksymalnym wspolczynnikiem I-Ej (Xn)
-        value = int(wg_czego_dzielic[-1])  # Nazwa kolumny wg ktorwej dzielimy frame  (X)
-        wg_czego_dzielic = wg_czego_dzielic[:-1]  # Wartosc w kolumnie wg ktorej dzielimy (n)
+        wg_czego_dzielic = splitNameString(str(E.idxmax(axis=1)[0]))  # Nazwa kolumny z maksymalnym wspolczynnikiem
+        # I-Ej (Xn)
+
+        value = int(wg_czego_dzielic[1])  # Wartosc w kolumnie wg ktorej dzielimy (n)
+        wg_czego_dzielic = wg_czego_dzielic[0]  # Nazwa kolumny wg ktorwej dzielimy frame  (X)
         # Podzial
         podzielone.append(frame[frame[wg_czego_dzielic] == value])
         podzielone.append(frame[frame[wg_czego_dzielic] != value])
@@ -297,7 +295,7 @@ class Tree:
                     Eip = (N / len(frame[frame.columns[-1]]))
                     Eim = (len(frame[frame.columns[-1]]) - N) / len(frame[frame.columns[-1]])
                     E.append(Eip * sum_plus + Eim * sum_minus)  # Oblicz Ej
-                    kolumny.append(variable + str(value))  # Oznacz kolumne w dataframe np (W3)
+                    kolumny.append(variable + "/" + str(value))  # Oznacz kolumne w dataframe np (W3)
         E = pd.DataFrame(E)
         E = E.transpose()
         E.columns = kolumny
@@ -377,6 +375,11 @@ class Node:
         return self.left is not None
 
 
+def splitNameString(name):
+    result = name.split(sep="/")
+    return result
+
+
 def sample_use(recursion_limit, file, rename_columns=False, rename_list=None, indexes_in_first_column=False):
     """
         Description:
@@ -403,7 +406,5 @@ def sample_use(recursion_limit, file, rename_columns=False, rename_list=None, in
     drzewko.print_diagram()
     drzewko.print_leafs()
 
-
+print(splitNameString("granko/123")[1])
 sample_use(10 ** 6, "BDD.csv", True, ['P', 'W', 'B', 'O', 'PR', 'ST'], True)
-
-
